@@ -1,3 +1,6 @@
+dynrel
+======
+
 Dynamic Relocation Entry Retriever for ELF Binaries
 
 Scripts tested on OpenBSD 5.2 amd64. Works on unstripped binaries.
