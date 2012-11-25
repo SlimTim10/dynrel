@@ -1,0 +1,83 @@
+Dynamic Relocation Entry Retriever for ELF Binaries
+
+Scripts tested on OpenBSD 5.2 amd64. Works on unstripped binaries.
+
+usage: ./dynreladdr.pl elf_file call_address
+
+Retrieve the name of the dynamic relocation entry with offset call_address and print it out.
+
+Example:
+~ $ objdump -d -j .text -M intel santa | grep -A20 '<main>:' | grep 'call' | head -n 2
+     ffd:       e8 3e fd ff ff          call   d40 <__init+0x80>
+    102c:       e8 2f fd ff ff          call   d60 <__init+0xa0>
+~ $ ./dynreladdr.pl santa d40
+time
+~ $ ./dynreladdr.pl santa d60
+fwrite
+
+MANUAL PROCESS
+Disassemble the .plt section of the input file.
+    objdump -d -j .plt -M intel santa
+Locate the line at call_address.
+    d40:   ff 25 ea 0a 30 00       jmp    ds:0x300aea
+Convert offset to absolute address.
+    0x300aea + 0xd46 = 0x301830
+Get dynamic relocation records.
+    objdump -R santa
+Find name value at calculated offset.
+    0000000000301830 R_X86_64_JUMP_SLOT  time
+
+
+usage: ./dynrelmain.pl elf_file
+
+Retrieve the name of the dynamic relocation entry of each called offset in the main routine and write the new disassembly to elf_file.main.
+
+Example:
+~ $ objdump -d -j .text -M intel santa | grep -A20 '<main>:'
+0000000000000ff0 <main>:
+     ff0:       55                      push   rbp
+     ff1:       48 89 e5                mov    rbp,rsp
+     ff4:       48 83 ec 10             sub    rsp,0x10
+     ff8:       bf 00 00 00 00          mov    edi,0x0
+     ffd:       e8 3e fd ff ff          call   d40 <__init+0x80>
+    1002:       89 45 fc                mov    DWORD PTR [rbp-4],eax
+    1005:       8b 45 fc                mov    eax,DWORD PTR [rbp-4]
+    1008:       83 f8 ff                cmp    eax,0xffffffffffffffff
+    100b:       75 2e                   jne    103b <main+0x4b>
+    100d:       48 8b 05 54 08 30 00    mov    rax,ds:0x300854
+    1014:       48 8d 88 30 01 00 00    lea    rcx,[rax+304]
+    101b:       ba 17 00 00 00          mov    edx,0x17
+    1020:       be 01 00 00 00          mov    esi,0x1
+    1025:       48 8d 3d 2c 03 10 00    lea    rdi,ds:0x10032c
+    102c:       e8 2f fd ff ff          call   d60 <__init+0xa0>
+    1031:       bf 01 00 00 00          mov    edi,0x1
+    1036:       e8 35 fd ff ff          call   d70 <__init+0xb0>
+    103b:       48 8d 7d fc             lea    rdi,[rbp-4]
+    103f:       e8 ec fc ff ff          call   d30 <__init+0x70>
+    1044:       48 89 45 f0             mov    DWORD PTR [rbp-16],rax
+~ $ ./dynrelmain.pl santa
+~ $ head -n 20 santa.main
+0000000000000ff0 <main>:
+     ff0:       55                      push   rbp
+     ff1:       48 89 e5                mov    rbp,rsp
+     ff4:       48 83 ec 10             sub    rsp,0x10
+     ff8:       bf 00 00 00 00          mov    edi,0x0
+     ffd:       e8 3e fd ff ff          call   d40 <time>
+    1002:       89 45 fc                mov    DWORD PTR [rbp-4],eax
+    1005:       8b 45 fc                mov    eax,DWORD PTR [rbp-4]
+    1008:       83 f8 ff                cmp    eax,0xffffffffffffffff
+    100b:       75 2e                   jne    103b <main+0x4b>
+    100d:       48 8b 05 54 08 30 00    mov    rax,ds:0x300854
+    1014:       48 8d 88 30 01 00 00    lea    rcx,[rax+304]
+    101b:       ba 17 00 00 00          mov    edx,0x17
+    1020:       be 01 00 00 00          mov    esi,0x1
+    1025:       48 8d 3d 2c 03 10 00    lea    rdi,ds:0x10032c
+    102c:       e8 2f fd ff ff          call   d60 <fwrite>
+    1031:       bf 01 00 00 00          mov    edi,0x1
+    1036:       e8 35 fd ff ff          call   d70 <exit>
+    103b:       48 8d 7d fc             lea    rdi,[rbp-4]
+    103f:       e8 ec fc ff ff          call   d30 <localtime>
+
+
+SlimTim10
+2012-11-25
